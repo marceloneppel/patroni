@@ -309,25 +309,39 @@ class Raft(AbstractDCS):
 
     def _load_cluster(self):
         prefix = self.client_path('')
+        logger.info(f"prefix: {prefix}")
         response = self._sync_obj.get(prefix, recursive=True)
+        logger.info(f"response: {response}")
         if not response:
             return Cluster(None, None, None, None, [], None, None, None, None)
         nodes = {os.path.relpath(key, prefix).replace('\\', '/'): value for key, value in response.items()}
+        logger.info(f"nodes: {nodes}")
 
         # get initialize flag
+        logger.info(f"self._INITIALIZE: {self._INITIALIZE}")
         initialize = nodes.get(self._INITIALIZE)
+        logger.info(f"initialize: {initialize}")
         initialize = initialize and initialize['value']
+        logger.info(f"initialize2: {initialize}")
 
         # get global dynamic configuration
+        logger.info(f"self._CONFIG: {self._CONFIG}")
         config = nodes.get(self._CONFIG)
+        logger.info(f"config: {config}")
         config = config and ClusterConfig.from_node(config['index'], config['value'])
+        logger.info(f"config 2: {config}")
 
         # get timeline history
+        logger.info(f"self._HISTORY: {self._HISTORY}")
         history = nodes.get(self._HISTORY)
+        logger.info(f"history: {history}")
         history = history and TimelineHistory.from_node(history['index'], history['value'])
+        logger.info(f"history 2: {history}")
 
         # get last know leader lsn and slots
+        logger.info(f"self._STATUS: {self._STATUS}")
         status = nodes.get(self._STATUS)
+        logger.info(f"status: {status}")
         if status:
             try:
                 status = json.loads(status['value'])
