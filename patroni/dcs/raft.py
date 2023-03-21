@@ -82,6 +82,7 @@ class DynMemberSyncObj(SyncObj):
 
     def _onTick(self, timeToWait=0.0):
         super(DynMemberSyncObj, self)._onTick(timeToWait)
+        logger.info("on tick called")
 
         # The SyncObj calls onReady callback only when cluster got the leader and is ready for writes.
         # In some cases for us it is safe to "signal" the Raft object when the local log is fully applied.
@@ -120,9 +121,11 @@ class KVStoreTTL(DynMemberSyncObj):
                            fullDumpFile=(file_template + '.dump' if self_addr else None),
                            journalFile=(file_template + '.journal' if self_addr else None),
                            onReady=on_ready, dynamicMembershipChange=True)
+        logger.info(f"conf: {str(conf)}")
 
         super(KVStoreTTL, self).__init__(self_addr, partner_addrs, conf)
         self.__data = {}
+        logger.info(f"self.__data: {self.__data}")
 
     @staticmethod
     def __check_requirements(old_value, **kwargs):
@@ -141,6 +144,9 @@ class KVStoreTTL(DynMemberSyncObj):
             ret.update(result=result, error=error)
             event.set()
 
+        logger.info(f"retry event: {str(event)}")
+        logger.info(f"retry ret: {str(ret)}")
+
         kwargs['callback'] = callback
         timeout = kwargs.pop('timeout', None) or self.__retry_timeout
         deadline = timeout and time.time() + timeout
@@ -149,6 +155,8 @@ class KVStoreTTL(DynMemberSyncObj):
             event.clear()
             func(*args, **kwargs)
             event.wait(timeout)
+            logger.info(f"retry event 1: {str(event)}")
+            logger.info(f"retry ret 1: {str(ret)}")
             if ret['error'] == FAIL_REASON.SUCCESS:
                 return ret['result']
             elif ret['error'] == FAIL_REASON.REQUEST_DENIED:
@@ -230,6 +238,7 @@ class KVStoreTTL(DynMemberSyncObj):
                 self._expire(key, value, callback=callback)
 
     def get(self, key, recursive=False):
+        logger.info(f"get: {key} - {recursive} - {self.__data}")
         if not recursive:
             return self.__data.get(key)
         return {k: v for k, v in self.__data.items() if k.startswith(key)}
