@@ -195,6 +195,7 @@ class Postgresql(object):
 
         :returns: `!True` when return_code == 0, otherwise `!False`"""
 
+        logger.info(f"called pg_ctl: {str(cmd)}")
         pg_ctl = [self.pgcommand('pg_ctl'), cmd]
         return subprocess.call(pg_ctl + ['-D', self._data_dir] + list(args), **kwargs) == 0
 
@@ -649,6 +650,7 @@ class Postgresql(object):
             self.set_state('stopping')
 
         # Send signal to postmaster to stop
+        logger.info("called _do_stop")
         success = postmaster.signal_stop(mode, self.pgcommand('pg_ctl'))
         if success is not None:
             if success and on_safepoint:
@@ -690,6 +692,7 @@ class Postgresql(object):
     def terminate_postmaster(self, postmaster, mode, stop_timeout):
         if mode in ['fast', 'smart']:
             try:
+                logger.info("called terminate_postmaster")
                 success = postmaster.signal_stop('immediate', self.pgcommand('pg_ctl'))
                 if success:
                     return True
@@ -703,6 +706,7 @@ class Postgresql(object):
     def terminate_starting_postmaster(self, postmaster):
         """Terminates a postmaster that has not yet opened ports or possibly even written a pid file. Blocks
         until the process goes away."""
+        logger.info("called terminate_starting_postmaster")
         postmaster.signal_stop('immediate', self.pgcommand('pg_ctl'))
         postmaster.wait()
 
@@ -716,6 +720,7 @@ class Postgresql(object):
             pass
 
     def reload(self, block_callbacks=False):
+        logger.info("called reload")
         ret = self.pg_ctl('reload')
         if ret and not block_callbacks:
             self.call_nowait(ACTION_ON_RELOAD)
@@ -945,6 +950,8 @@ class Postgresql(object):
             return False
 
         self.slots_handler.on_promote()
+
+        logger.info(f"called promote: {wait_seconds} - {task} - {on_success}")
 
         ret = self.pg_ctl('promote', '-W')
         if ret:

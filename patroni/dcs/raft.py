@@ -266,6 +266,8 @@ class Raft(AbstractDCS):
         self._ttl = int(config.get('ttl') or 30)
 
         ready_event = threading.Event()
+        logger.info(f"ready_event: {ready_event}")
+        logger.info(f"config: {config}")
         self._sync_obj = KVStoreTTL(ready_event.set, self._on_set, self._on_delete, commandsWaitLeader=False, **config)
         self._sync_obj.startAutoTick()
 
@@ -278,6 +280,7 @@ class Raft(AbstractDCS):
         self.set_retry_timeout(int(config.get('retry_timeout') or 10))
 
     def _on_set(self, key, value):
+        logger.info(f"_on_set: {key} - {value}")
         leader = (self._sync_obj.get(self.leader_path) or {}).get('value')
         if key == value['created'] == value['updated'] and \
                 (key.startswith(self.members_path) or key == self.leader_path and leader != self._name) or \
@@ -286,10 +289,12 @@ class Raft(AbstractDCS):
             self.event.set()
 
     def _on_delete(self, key):
+        logger.info(f"_on_delete: {key}")
         if key == self.leader_path:
             self.event.set()
 
     def set_ttl(self, ttl):
+        logger.info(f"set_ttl: {ttl}")
         self._ttl = ttl
 
     @property
@@ -297,14 +302,17 @@ class Raft(AbstractDCS):
         return self._ttl
 
     def set_retry_timeout(self, retry_timeout):
+        logger.info(f"set_retry_timeout: {retry_timeout}")
         self._sync_obj.set_retry_timeout(retry_timeout)
 
     def reload_config(self, config):
+        logger.info(f"reload_config: {config}")
         super(Raft, self).reload_config(config)
         globalDnsResolver().setTimeouts(self.ttl, self.loop_wait)
 
     @staticmethod
     def member(key, value):
+        logger.info(f"member: {key} - {value}")
         return Member.from_node(value['index'], os.path.basename(key), None, value['value'])
 
     def _load_cluster(self):
