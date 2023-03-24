@@ -40,16 +40,21 @@ setattr(TCPNode, 'ip', property(resolve_host))
 class SyncObjUtility(object):
 
     def __init__(self, otherNodes, conf):
+        logger.info(f"SyncObjUtility: {otherNodes} - {conf}")
         self._nodes = otherNodes
         self._utility = TcpUtility(conf.password)
 
     def executeCommand(self, command):
         try:
-            return self._utility.executeCommand(self.__node, command)
-        except Exception:
+            result = self._utility.executeCommand(self.__node, command)
+            logger.info(f"executeCommand result: {result} - {self.__node} - {command}")
+            return result
+        except Exception as e:
+            logger.info(f"failed executeCommand: {str(e)} - {self.__node} - {command}")
             return None
 
     def getMembers(self):
+        logger.info(f"getMembers: {self._nodes}")
         for self.__node in self._nodes:
             response = self.executeCommand(['members'])
             if response:
