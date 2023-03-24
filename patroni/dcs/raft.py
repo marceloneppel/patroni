@@ -87,7 +87,7 @@ class DynMemberSyncObj(SyncObj):
 
     def _onTick(self, timeToWait=0.0):
         super(DynMemberSyncObj, self)._onTick(timeToWait)
-        logger.info("on tick called")
+        # logger.info("on tick called")
 
         # The SyncObj calls onReady callback only when cluster got the leader and is ready for writes.
         # In some cases for us it is safe to "signal" the Raft object when the local log is fully applied.
