@@ -1,4 +1,5 @@
 import abc
+import logging
 import os
 import signal
 import six
@@ -55,6 +56,10 @@ class AbstractPatroniDaemon(object):
             if self._received_sighup:
                 self._received_sighup = False
                 self.reload_config(True, self.config.reload_local_configuration())
+                # import importlib
+                # for module in sys.modules.values():
+                #     importlib.reload(module)
+                #     logging.info(f"reloaded {module}")
 
             self._run_cycle()
 
