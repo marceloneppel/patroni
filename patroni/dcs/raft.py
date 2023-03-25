@@ -46,8 +46,13 @@ class SyncObjUtility(object):
 
     def executeCommand(self, command):
         try:
-            result = self._utility.executeCommand(self.__node, command)
-            logger.info(f"executeCommand result: {result} - {self.__node} - {command}")
+            while True:
+                result = self._utility.executeCommand(self.__node, command)
+                logger.info(f"executeCommand result: {result} - {self.__node} - {command}")
+                if not str(result).startswith("FAIL ADD "):
+                    logger.info("done!")
+                    break
+                logger.info("continuing...")
             return result
         except Exception as e:
             logger.info(f"failed executeCommand: {str(e)} - {self.__node} - {command}")
