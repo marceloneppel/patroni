@@ -414,9 +414,12 @@ class Raft(AbstractDCS):
         return self._sync_obj.set(self.status_path, value, timeout=1)
 
     def _update_leader(self):
+        logger.info(f"_update_leader: {self.leader_path} - {self._name} - {self._ttl} - {self._name}")
         ret = self._sync_obj.set(self.leader_path, self._name, ttl=self._ttl, prevValue=self._name)
+        logger.info(f"_update_leader ret 1: {ret}")
         if not ret and self._sync_obj.get(self.leader_path) is None:
             ret = self.attempt_to_acquire_leader()
+            logger.info(f"_update_leader ret 2: {ret}")
         return ret
 
     def attempt_to_acquire_leader(self, permanent=False):
