@@ -40,26 +40,16 @@ setattr(TCPNode, 'ip', property(resolve_host))
 class SyncObjUtility(object):
 
     def __init__(self, otherNodes, conf):
-        logger.info(f"SyncObjUtility: {otherNodes} - {conf}")
         self._nodes = otherNodes
         self._utility = TcpUtility(conf.password)
 
     def executeCommand(self, command):
         try:
-            while True:
-                result = self._utility.executeCommand(self.__node, command)
-                logger.info(f"executeCommand result: {result} - {self.__node} - {command}")
-                if not str(result).startswith("FAIL ADD "):
-                    logger.info("done!")
-                    break
-                logger.info("continuing...")
-            return result
-        except Exception as e:
-            logger.info(f"failed executeCommand: {str(e)} - {self.__node} - {command}")
+            return self._utility.executeCommand(self.__node, command)
+        except Exception:
             return None
 
     def getMembers(self):
-        logger.info(f"getMembers: {self._nodes}")
         for self.__node in self._nodes:
             response = self.executeCommand(['members'])
             if response:
@@ -92,7 +82,6 @@ class DynMemberSyncObj(SyncObj):
 
     def _onTick(self, timeToWait=0.0):
         super(DynMemberSyncObj, self)._onTick(timeToWait)
-        # logger.info("on tick called")
 
         # The SyncObj calls onReady callback only when cluster got the leader and is ready for writes.
         # In some cases for us it is safe to "signal" the Raft object when the local log is fully applied.
@@ -131,11 +120,9 @@ class KVStoreTTL(DynMemberSyncObj):
                            fullDumpFile=(file_template + '.dump' if self_addr else None),
                            journalFile=(file_template + '.journal' if self_addr else None),
                            onReady=on_ready, dynamicMembershipChange=True)
-        logger.info(f"conf: {str(conf)}")
 
         super(KVStoreTTL, self).__init__(self_addr, partner_addrs, conf)
         self.__data = {}
-        logger.info(f"self.__data: {self.__data}")
 
     @staticmethod
     def __check_requirements(old_value, **kwargs):
@@ -154,9 +141,6 @@ class KVStoreTTL(DynMemberSyncObj):
             ret.update(result=result, error=error)
             event.set()
 
-        logger.info(f"retry event: {str(event)}")
-        logger.info(f"retry ret: {str(ret)}")
-
         kwargs['callback'] = callback
         timeout = kwargs.pop('timeout', None) or self.__retry_timeout
         deadline = timeout and time.time() + timeout
@@ -165,8 +149,6 @@ class KVStoreTTL(DynMemberSyncObj):
             event.clear()
             func(*args, **kwargs)
             event.wait(timeout)
-            logger.info(f"retry event 1: {str(event)}")
-            logger.info(f"retry ret 1: {str(ret)}")
             if ret['error'] == FAIL_REASON.SUCCESS:
                 return ret['result']
             elif ret['error'] == FAIL_REASON.REQUEST_DENIED:
@@ -248,7 +230,6 @@ class KVStoreTTL(DynMemberSyncObj):
                 self._expire(key, value, callback=callback)
 
     def get(self, key, recursive=False):
-        logger.info(f"get: {key} - {recursive} - {self.__data}")
         if not recursive:
             return self.__data.get(key)
         return {k: v for k, v in self.__data.items() if k.startswith(key)}
@@ -285,8 +266,6 @@ class Raft(AbstractDCS):
         self._ttl = int(config.get('ttl') or 30)
 
         ready_event = threading.Event()
-        logger.info(f"ready_event: {ready_event}")
-        logger.info(f"config: {config}")
         self._sync_obj = KVStoreTTL(ready_event.set, self._on_set, self._on_delete, commandsWaitLeader=False, **config)
         self._sync_obj.startAutoTick()
 
@@ -299,7 +278,6 @@ class Raft(AbstractDCS):
         self.set_retry_timeout(int(config.get('retry_timeout') or 10))
 
     def _on_set(self, key, value):
-        logger.info(f"_on_set: {key} - {value}")
         leader = (self._sync_obj.get(self.leader_path) or {}).get('value')
         if key == value['created'] == value['updated'] and \
                 (key.startswith(self.members_path) or key == self.leader_path and leader != self._name) or \
@@ -308,12 +286,10 @@ class Raft(AbstractDCS):
             self.event.set()
 
     def _on_delete(self, key):
-        logger.info(f"_on_delete: {key}")
         if key == self.leader_path:
             self.event.set()
 
     def set_ttl(self, ttl):
-        logger.info(f"set_ttl: {ttl}")
         self._ttl = ttl
 
     @property
@@ -321,54 +297,37 @@ class Raft(AbstractDCS):
         return self._ttl
 
     def set_retry_timeout(self, retry_timeout):
-        logger.info(f"set_retry_timeout: {retry_timeout}")
         self._sync_obj.set_retry_timeout(retry_timeout)
 
     def reload_config(self, config):
-        logger.info(f"reload_config: {config}")
         super(Raft, self).reload_config(config)
         globalDnsResolver().setTimeouts(self.ttl, self.loop_wait)
 
     @staticmethod
     def member(key, value):
-        logger.info(f"member: {key} - {value}")
         return Member.from_node(value['index'], os.path.basename(key), None, value['value'])
 
     def _load_cluster(self):
         prefix = self.client_path('')
-        logger.info(f"prefix: {prefix}")
         response = self._sync_obj.get(prefix, recursive=True)
-        logger.info(f"response: {response}")
         if not response:
             return Cluster(None, None, None, None, [], None, None, None, None)
         nodes = {os.path.relpath(key, prefix).replace('\\', '/'): value for key, value in response.items()}
-        logger.info(f"nodes: {nodes}")
 
         # get initialize flag
-        logger.info(f"self._INITIALIZE: {self._INITIALIZE}")
         initialize = nodes.get(self._INITIALIZE)
-        logger.info(f"initialize: {initialize}")
         initialize = initialize and initialize['value']
-        logger.info(f"initialize2: {initialize}")
 
         # get global dynamic configuration
-        logger.info(f"self._CONFIG: {self._CONFIG}")
         config = nodes.get(self._CONFIG)
-        logger.info(f"config: {config}")
         config = config and ClusterConfig.from_node(config['index'], config['value'])
-        logger.info(f"config 2: {config}")
 
         # get timeline history
-        logger.info(f"self._HISTORY: {self._HISTORY}")
         history = nodes.get(self._HISTORY)
-        logger.info(f"history: {history}")
         history = history and TimelineHistory.from_node(history['index'], history['value'])
-        logger.info(f"history 2: {history}")
 
         # get last know leader lsn and slots
-        logger.info(f"self._STATUS: {self._STATUS}")
         status = nodes.get(self._STATUS)
-        logger.info(f"status: {status}")
         if status:
             try:
                 status = json.loads(status['value'])
@@ -414,12 +373,9 @@ class Raft(AbstractDCS):
         return self._sync_obj.set(self.status_path, value, timeout=1)
 
     def _update_leader(self):
-        logger.info(f"_update_leader: {self.leader_path} - {self._name} - {self._ttl} - {self._name}")
         ret = self._sync_obj.set(self.leader_path, self._name, ttl=self._ttl, prevValue=self._name)
-        logger.info(f"_update_leader ret 1: {ret}")
         if not ret and self._sync_obj.get(self.leader_path) is None:
             ret = self.attempt_to_acquire_leader()
-            logger.info(f"_update_leader ret 2: {ret}")
         return ret
 
     def attempt_to_acquire_leader(self, permanent=False):
