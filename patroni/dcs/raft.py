@@ -47,7 +47,7 @@ class SyncObjUtility(object):
         try:
             return self._utility.executeCommand(self.__node, command)
         except Exception as e:
-            logger.info(f"executeCommand: command={command} - e={str(e)}")
+            logger.info(f"executeCommand: self.__node={str(self.__node)} command={command} - e={str(e)}")
             return None
 
     def getMembers(self):
