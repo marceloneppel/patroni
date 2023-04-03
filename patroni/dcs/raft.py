@@ -68,6 +68,7 @@ class DynMemberSyncObj(SyncObj):
         add_self = members and selfAddress not in members
 
         partnerAddrs = [member for member in (members or partnerAddrs) if member != selfAddress]
+        logger.info(f"partnerAddrs: {partnerAddrs}")
 
         super(DynMemberSyncObj, self).__init__(selfAddress, partnerAddrs, conf, transportClass=_TCPTransport)
 
