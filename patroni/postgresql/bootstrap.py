@@ -32,7 +32,7 @@ class Bootstrap(object):
         return self._running_custom_bootstrap and self._keep_existing_recovery_conf
 
     @staticmethod
-    def process_user_options(tool: str,
+    def  process_user_options(tool: str,
                              options: Union[Any, Dict[str, str], List[Union[str, Dict[str, Any]]]],
                              not_allowed_options: Tuple[str, ...],
                              error_handler: Callable[[str], None]) -> List[str]:
@@ -308,6 +308,11 @@ class Bootstrap(object):
                 if ret == 0:
                     break
                 else:
+                    logger.error([self._postgresql.pgcommand('pg_basebackup'),
+                                                         '--pgdata=' + self._postgresql.data_dir, '-X', 'stream',
+                                                         '--dbname=' + conn_url])
+                    logger.error(user_options)
+                    logger.error(env)
                     logger.error('Error when fetching backup: pg_basebackup exited with code=%s', ret)
 
             except Exception as e:
