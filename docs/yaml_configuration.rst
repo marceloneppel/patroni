@@ -204,6 +204,15 @@ Raft (deprecated)
 -  **partner\_addrs**: list of other Patroni nodes in the cluster in format: ['ip1:port', 'ip2:port', 'etc...']
 -  **data\_dir**: directory where to store Raft log and snapshot. If not specified the current working directory is used.
 -  **password**: (optional) Encrypt Raft traffic with a specified password, requires ``cryptography`` python module.
+-  **raft\_min\_timeout**: (optional) minimum election timeout in seconds for the underlying pysyncobj Raft implementation. Default: ``0.4``.
+-  **raft\_max\_timeout**: (optional) maximum election timeout in seconds for the underlying pysyncobj Raft implementation. Default: ``1.4``.
+-  **connection\_timeout**: (optional) time in seconds after which a connection with no data received is considered dead. Should be greater than or equal to ``raft_max_timeout``. Default: ``3.5``.
+-  **append\_entries\_period**: (optional) interval in seconds for sending heartbeat (append\_entries) commands. Must be less than one-third of ``raft_min_timeout``. Default: ``0.1``.
+-  **connection\_retry\_time**: (optional) interval in seconds between reconnection attempts to offline nodes. Default: ``5.0``.
+-  **leader\_fallback\_timeout**: (optional) time in seconds after which a leader with no response from the majority falls back to follower state. Default: ``30.0``.
+
+   .. note::
+      These timeout parameters are useful for high-latency networks where the default pysyncobj timeouts are too aggressive. The following constraints must be satisfied: ``raft_min_timeout`` > 3 \* ``append_entries_period``, ``raft_max_timeout`` > ``raft_min_timeout``, ``connection_timeout`` >= ``raft_max_timeout``, and ``leader_fallback_timeout`` > ``append_entries_period``. Patroni validates these at startup and will refuse to start if they are violated. These values cannot be changed at runtime and require a restart.
 
    Short FAQ about Raft implementation
 

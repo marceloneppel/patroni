@@ -1119,7 +1119,13 @@ schema = Schema({
             Optional("bind_addr"): validate_host_port_listen,
             "partner_addrs": validate_host_port_list,
             Optional("data_dir"): str,
-            Optional("password"): str
+            Optional("password"): str,
+            Optional("raft_min_timeout"): Or(int, float),
+            Optional("raft_max_timeout"): Or(int, float),
+            Optional("connection_timeout"): Or(int, float),
+            Optional("append_entries_period"): Or(int, float),
+            Optional("connection_retry_time"): Or(int, float),
+            Optional("leader_fallback_timeout"): Or(int, float),
         },
         "zookeeper": {
             "hosts": Or(comma_separated_host_port, [validate_host_port]),
