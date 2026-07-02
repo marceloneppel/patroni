@@ -556,6 +556,29 @@ class TestHa(PostgresInit):
         self.assertEqual(self.ha.run_cycle(),
                          'continue to run as a leader because failsafe mode is enabled and all members are accessible')
 
+    def test_call_failsafe_member_timeout(self):
+        member = RemoteMember('postgresql1', {'api_url': 'http://localhost:8011/patroni'})
+
+        def call_and_get_timeout(data):
+            self.ha.cluster = get_cluster_initialized_without_leader(
+                leader=True, failsafe=True, cluster_config=ClusterConfig(1, data, 1))
+            global_config.update(self.ha.cluster)
+            self.ha.patroni.request = Mock(side_effect=Exception)
+            self.ha.call_failsafe_member({}, member)
+            return self.ha.patroni.request.call_args[1]['timeout']
+
+        # not configured: matches the previously hardcoded value
+        self.assertEqual(call_and_get_timeout({'failsafe_mode': True}), 2)
+        # configured and within the ttl budget: used as is
+        self.assertEqual(call_and_get_timeout(
+            {'failsafe_mode': True, 'ttl': 60, 'failsafe_timeout': 10}), 10)
+        # retries must stay 1 (the budget math assumes up to 2 connection attempts)
+        self.assertEqual(self.ha.patroni.request.call_args[1]['retries'], 1)
+        # garbage raw values in DCS /config (possible via PATCH /config) must not inflate
+        # the budget beyond what the sanitized in-force values allow
+        self.assertEqual(call_and_get_timeout(
+            {'failsafe_mode': True, 'ttl': 60, 'loop_wait': -100, 'failsafe_timeout': 100}), 19)
+
     def test_no_dcs_connection_primary_failsafe(self):
         self.ha.load_cluster_from_dcs = Mock(side_effect=DCSError('Etcd is not responding properly'))
         self.ha.cluster = get_cluster_initialized_with_leader_and_failsafe()

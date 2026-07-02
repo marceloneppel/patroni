@@ -1284,11 +1284,15 @@ class Ha(object):
         :param data: data to be send in the POST request.
 
         :returns: a :class:`_FailsafeResponse` object.
+
+        .. note::
+            The request timeout is controlled by the ``failsafe_timeout`` global configuration parameter.
         """
         endpoint = 'failsafe'
         url = member.get_endpoint_url(endpoint)
         try:
-            response = self.patroni.request(member, 'post', endpoint, data, timeout=2, retries=1)
+            response = self.patroni.request(member, 'post', endpoint, data,
+                                            timeout=global_config.failsafe_timeout, retries=1)
             response_data = response.data.decode('utf-8')
             logger.info('Got response from %s %s: %s', member.name, url, response_data)
             accepted = response.status == 200 and response_data == 'Accepted'

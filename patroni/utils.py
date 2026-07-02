@@ -552,6 +552,36 @@ def parse_real(value: Any, base_unit: Optional[str] = None) -> Optional[float]:
         return convert_to_base_unit(val, unit, base_unit)
 
 
+def effective_failsafe_timeout(value: int, ttl: int, loop_wait: int, retry_timeout: int) -> int:
+    """Calculate the effective request timeout for ``POST /failsafe`` REST API calls.
+
+    The *value* is capped so that a full round of failsafe checks (up to two connection
+    attempts, because requests are executed with one retry) keeps within the time budget
+    that remains from the leader key *ttl* after the worst-case DCS communication time
+    ``loop_wait + 2 * retry_timeout`` is spent. This cap assumes up to two
+    connection-timeout-bounded attempts (``retries=1``) and is not an absolute wall-clock
+    guarantee (urllib3 connect errors retry; read timeouts do not). Otherwise, in case of
+    a real network partition, some node on the other side could acquire the leader lock
+    while we are still waiting for failsafe responses. That is, the following rule is
+    enforced: ``loop_wait + 2 * retry_timeout + 2 * failsafe_timeout <= ttl``.
+
+    *loop_wait* and *retry_timeout* are clamped to the same minimums that
+    :meth:`~patroni.config.Config._validate_and_adjust_timeouts` enforces (``loop_wait >= 1``,
+    ``retry_timeout >= 3``), so raw ``/config`` values below those minimums cannot inflate
+    the budget.
+
+    The lower bound of ``2`` seconds matches the historically hardcoded timeout.
+
+    :param value: configured ``failsafe_timeout``.
+    :param ttl: leader key time-to-live.
+    :param loop_wait: heartbeat loop period.
+    :param retry_timeout: timeout for DCS and PostgreSQL operations.
+
+    :returns: the capped timeout value that is safe to use for failsafe requests.
+    """
+    return max(2, min(value, (ttl - max(loop_wait, 1) - 2 * max(retry_timeout, 3)) // 2))
+
+
 def compare_values(vartype: str, unit: Optional[str], settings_value: Any, config_value: Any) -> bool:
     """Check if the value from ``pg_settings`` and from Patroni config are equivalent after parsing them as *vartype*.
 

@@ -4,8 +4,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 from patroni.exceptions import PatroniException
-from patroni.utils import apply_keepalive_limit, enable_keepalive, get_major_version, get_postgres_version, \
-    polling_loop, process_user_options, Retry, RetryFailedError, unquote, validate_directory
+from patroni.utils import apply_keepalive_limit, effective_failsafe_timeout, enable_keepalive, get_major_version, \
+    get_postgres_version, polling_loop, process_user_options, Retry, RetryFailedError, unquote, validate_directory
 
 
 class TestUtils(unittest.TestCase):
@@ -176,6 +176,20 @@ class TestUtils(unittest.TestCase):
                 ),
                 ['--checkpoint=fast', '--label=standby'],
             )
+
+    def test_effective_failsafe_timeout(self):
+        # fits into the budget (60 - 10 - 2*10) // 2 = 15: used as is
+        self.assertEqual(effective_failsafe_timeout(10, 60, 10, 10), 10)
+        # exceeds the budget: capped to it
+        self.assertEqual(effective_failsafe_timeout(100, 60, 10, 10), 15)
+        # no budget left with default timings: floor of 2 (the previously hardcoded value)
+        self.assertEqual(effective_failsafe_timeout(10, 30, 10, 10), 2)
+        # below the floor: raised to 2
+        self.assertEqual(effective_failsafe_timeout(1, 60, 10, 10), 2)
+        # raw values below the validator minimums are clamped (loop_wait >= 1, retry_timeout >= 3),
+        # matching what _validate_and_adjust_timeouts enforces on the running node
+        self.assertEqual(effective_failsafe_timeout(100, 60, -100, 10), 19)
+        self.assertEqual(effective_failsafe_timeout(100, 60, 10, 0), 22)
 
 
 @patch('time.sleep', Mock())

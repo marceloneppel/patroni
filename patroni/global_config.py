@@ -11,7 +11,7 @@ from copy import deepcopy
 from typing import Any, cast, Dict, List, Optional, TYPE_CHECKING
 
 from .collections import EMPTY_DICT
-from .utils import parse_bool, parse_int
+from .utils import effective_failsafe_timeout, parse_bool, parse_int
 
 if TYPE_CHECKING:  # pragma: no cover
     from .dcs import Cluster
@@ -248,6 +248,17 @@ class GlobalConfig(types.ModuleType):
         Assume ``1800`` if it is not set or invalid.
         """
         return self.get_int('member_slots_ttl', 1800, base_unit='s')
+
+    @property
+    def failsafe_timeout(self) -> int:
+        """Effective request timeout for ``POST /failsafe`` REST API calls.
+
+        .. note::
+            The configured value is capped based on ``ttl``, ``loop_wait``, and
+            ``retry_timeout``, see :func:`~patroni.utils.effective_failsafe_timeout`.
+        """
+        return effective_failsafe_timeout(self.get_int('failsafe_timeout', 2), self.get_int('ttl', 30),
+                                          self.get_int('loop_wait', 10), self.get_int('retry_timeout', 10))
 
 
 sys.modules[__name__] = GlobalConfig()
