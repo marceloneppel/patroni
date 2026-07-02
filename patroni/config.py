@@ -19,7 +19,7 @@ from .exceptions import ConfigParseError
 from .file_perm import pg_perm
 from .postgresql.config import ConfigHandler
 from .postgresql.misc import PostgresqlRole
-from .utils import deep_compare, parse_bool, parse_int, parse_real, patch_config
+from .utils import deep_compare, effective_failsafe_timeout, parse_bool, parse_int, parse_real, patch_config
 from .validator import IntValidator, validate_name
 
 logger = logging.getLogger(__name__)
@@ -311,6 +311,12 @@ class Config(object):
             We prefer to reduce ``loop_wait`` and will reduce ``retry_timeout`` only if ``loop_wait``
             is already set to a minimal possible value.
 
+        When ``failsafe_mode`` is enabled and ``failsafe_timeout`` is explicitly set, this method
+        also validates that ``failsafe_timeout`` fits within the remaining ttl budget
+        (``loop_wait + 2*retry_timeout + 2*failsafe_timeout <= ttl``). Unlike the other parameters,
+        ``failsafe_timeout`` is never auto-adjusted here; the cap is applied at run time instead. A
+        warning is emitted so the operator learns of the effective value before a DCS outage occurs.
+
         :param config: :class:`dict` object with new global configuration.
         """
 
@@ -329,6 +335,16 @@ class Config(object):
             config['loop_wait'] = ttl - 2 * retry_timeout
             logger.warning('Violated the rule "loop_wait + 2*retry_timeout <= ttl", where ttl=%d and retry_timeout=%d.'
                            ' Adjusting loop_wait from %d to %d', ttl, retry_timeout, loop_wait, config['loop_wait'])
+
+        failsafe_timeout = parse_int(config.get('failsafe_timeout'))
+        if failsafe_timeout is not None and parse_bool(config.get('failsafe_mode')):
+            loop_wait = int(config.get('loop_wait', loop_wait))
+            retry_timeout = int(config.get('retry_timeout', retry_timeout))
+            effective = effective_failsafe_timeout(failsafe_timeout, ttl, loop_wait, retry_timeout)
+            if effective < failsafe_timeout:
+                logger.warning('Violated the rule "loop_wait + 2*retry_timeout + 2*failsafe_timeout <= ttl", '
+                               'where ttl=%d, loop_wait=%d and retry_timeout=%d. The failsafe_timeout=%d will be '
+                               'capped to %d at run time', ttl, loop_wait, retry_timeout, failsafe_timeout, effective)
 
     # configuration could be either ClusterConfig or dict
     def set_dynamic_configuration(self, configuration: Union[ClusterConfig, Dict[str, Any]]) -> bool:

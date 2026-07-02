@@ -1111,6 +1111,7 @@ schema = Schema({
             Optional("ttl"): IntValidator(min=20, raise_assert=True),
             Optional("loop_wait"): IntValidator(min=1, raise_assert=True),
             Optional("retry_timeout"): IntValidator(min=3, raise_assert=True),
+            Optional("failsafe_timeout"): IntValidator(min=2, raise_assert=True),
             Optional("maximum_lag_on_failover"): IntValidator(min=0, raise_assert=True),
             Optional("maximum_lag_on_syncnode"): IntValidator(min=-1, raise_assert=True),
             Optional('member_slots_ttl'): IntValidator(min=0, base_unit='s', raise_assert=True),

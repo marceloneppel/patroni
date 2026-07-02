@@ -297,6 +297,27 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(mock_logger.call_args_list[0][0],
                              ('Violated the rule "loop_wait + 2*retry_timeout <= ttl", where ttl=%d. Adjusting'
                               ' loop_wait from %d to %d and retry_timeout from %d to %d', 20, 10, 1, 10, 9))
+        with patch('patroni.config.logger.warning') as mock_logger:
+            self.config._validate_and_adjust_timeouts(
+                {'ttl': 60, 'loop_wait': 10, 'retry_timeout': 10,
+                 'failsafe_mode': True, 'failsafe_timeout': 100})
+            self.assertEqual(mock_logger.call_args_list[0][0],
+                             ('Violated the rule "loop_wait + 2*retry_timeout + 2*failsafe_timeout <= ttl", '
+                              'where ttl=%d, loop_wait=%d and retry_timeout=%d. The failsafe_timeout=%d will be '
+                              'capped to %d at run time', 60, 10, 10, 100, 15))
+
+        # no warning when failsafe_mode is not enabled, or the value fits, or it is not set,
+        # or the value is below the floor (silently raised, not capped)
+        with patch('patroni.config.logger.warning') as mock_logger:
+            self.config._validate_and_adjust_timeouts(
+                {'ttl': 60, 'loop_wait': 10, 'retry_timeout': 10, 'failsafe_timeout': 100})
+            self.config._validate_and_adjust_timeouts(
+                {'ttl': 60, 'loop_wait': 10, 'retry_timeout': 10,
+                 'failsafe_mode': True, 'failsafe_timeout': 15})
+            self.config._validate_and_adjust_timeouts({'failsafe_mode': True})
+            self.config._validate_and_adjust_timeouts(
+                {'ttl': 60, 'loop_wait': 10, 'retry_timeout': 10, 'failsafe_mode': True, 'failsafe_timeout': 1})
+            mock_logger.assert_not_called()
 
     def test_global_config_is_synchronous_mode(self):
         # we should ignore synchronous_mode setting in a standby cluster
