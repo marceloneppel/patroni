@@ -5,8 +5,9 @@ Feature: dcs failsafe mode
     Given I start postgres-0
     And postgres-0 is a leader after 10 seconds
     Then "config" key in DCS has ttl=30 after 10 seconds
-    When I issue a PATCH request to http://127.0.0.1:8008/config with {"loop_wait": 2, "ttl": 20, "retry_timeout": 3, "failsafe_mode": true}
+    When I issue a PATCH request to http://127.0.0.1:8008/config with {"loop_wait": 2, "ttl": 20, "retry_timeout": 3, "failsafe_mode": true, "failsafe_timeout": 5}
     Then I receive a response code 200
+    And "config" key in DCS has failsafe_timeout=5 after 10 seconds
     And Response on GET http://127.0.0.1:8008/failsafe contains postgres-0 after 10 seconds
     When I issue a GET request to http://127.0.0.1:8008/failsafe
     Then I receive a response code 200
