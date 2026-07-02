@@ -52,7 +52,7 @@ F.A.Q.
 
 - What if all members of the Patroni cluster are lost while DCS is down?
 
-  Patroni could be configured to create the new replica from the backup even when the cluster doesn't have a leader. But, if the new member isn't present in the ``/failsafe`` key, it will not be able to grab the leader lock and promote.
+  Patroni could be configured to create the new replica from the backup even when the cluster doesn't have a leader. But, if the new member isn’t present in the ``/failsafe`` key, it will not be able to grab the leader lock and promote.
 
 - What will happen if the primary lost access to DCS while replicas didn't?
 
@@ -61,3 +61,19 @@ F.A.Q.
 - How to enable the Failsafe Mode?
 
   Before enabling the ``failsafe_mode`` please make sure that Patroni version on all members is up-to-date. After that, you can use either the ``PATCH /config`` :ref:`REST API <rest_api>` or :ref:`patronictl edit-config -s failsafe_mode=true <patronictl_edit_config_parameters>`
+
+
+Failsafe on slow networks
+-------------------------
+
+By default Patroni waits up to 2 seconds for every ``POST /failsafe`` response. If round trips between
+cluster members may take longer (for example, geographically distributed clusters on degraded links),
+the ``failsafe_timeout`` global :ref:`dynamic configuration <dynamic_configuration>` parameter allows to increase it.
+
+To avoid a split-brain, all failsafe checks must finish before the leader key in DCS expires and some node
+on the other side of a real network partition could acquire the leader lock. Therefore Patroni enforces the rule
+``loop_wait + 2*retry_timeout + 2*failsafe_timeout <= ttl`` by capping the effective timeout at run time and
+logging a warning when the configured value doesn’t fit. E.g., with default values (``ttl=30``, ``loop_wait=10``,
+``retry_timeout=10``) there is no budget left and the default 2 seconds timeout is used; with ``ttl=60`` the
+``failsafe_timeout`` can be effectively increased up to 15 seconds. In other words, to give failsafe checks
+more time you also need to increase ``ttl`` (or reduce ``loop_wait``/``retry_timeout``).
