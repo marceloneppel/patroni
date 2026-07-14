@@ -1,5 +1,6 @@
 import os
 import tempfile
+import threading
 import time
 import unittest
 
@@ -125,6 +126,30 @@ class TestKVStoreTTL(unittest.TestCase):
                         partner_addrs=['127.0.0.1:1235'], patronictl=True)
         so.doTick(0)
         so.destroy()
+
+    @patch('time.sleep', Mock())
+    def test_auto_tick_thread_survives_dotick_exception(self):
+        self.so.destroy()
+        self.so = None
+        so = KVStoreTTL(None, None, None, self_addr='127.0.0.1:1234')
+        calls = []
+
+        def failing_tick(timeout):
+            calls.append(timeout)
+            if len(calls) == 1:
+                raise Exception('boom')  # first tick fails, e.g. an assert in _onTick
+            so._KVStoreTTL__destroying = True  # a tick ran after the failure -> stop the loop
+
+        with patch.object(so, 'doTick', side_effect=failing_tick):
+            thread = threading.Thread(target=so._autoTickThread)
+            thread.start()
+            thread.join(timeout=5)
+        so.destroy()
+
+        self.assertFalse(thread.is_alive())
+        # Without the guard the loop exits on the first exception (one call only),
+        # the thread dies and the notify pipe is never drained again.
+        self.assertGreaterEqual(len(calls), 2)
 
 
 class TestRaft(unittest.TestCase):

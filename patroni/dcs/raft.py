@@ -271,7 +271,13 @@ class KVStoreTTL(DynMemberSyncObj):
     def _autoTickThread(self) -> None:
         self.__destroying = False
         while not self.__destroying:
-            self.doTick(self.conf.autoTickPeriod)
+            try:
+                self.doTick(self.conf.autoTickPeriod)
+            except Exception:
+                # An unhandled exception would otherwise terminate the thread for good,
+                # silently stopping this node's participation in the Raft cluster.
+                logger.exception('Unexpected exception in the Raft tick loop')
+                time.sleep(self.conf.autoTickPeriod)
 
     def startAutoTick(self) -> None:
         self.__thread = threading.Thread(target=self._autoTickThread)
